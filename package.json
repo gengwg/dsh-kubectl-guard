@@ -4,13 +4,37 @@
   "description": "A dsh policy plugin that gates kubectl writes by kubeconfig context: hard-deny irreversible verbs outside local clusters, ask for the rest.",
   "type": "module",
   "main": "src/index.js",
-  "exports": { ".": "./src/index.js" },
-  "files": ["src"],
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
   "license": "MIT",
-  "scripts": { "test": "node --test test/*.test.js" },
-  "keywords": ["dsh-plugin", "dsh", "kubectl", "kubernetes", "safety"],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "kubectl",
+    "kubernetes",
+    "safety"
+  ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "author": "gengwg (https://github.com/gengwg)",
+  "homepage": "https://github.com/gengwg/dsh-kubectl-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gengwg/dsh-kubectl-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gengwg/dsh-kubectl-guard/issues"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
