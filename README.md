@@ -8,17 +8,33 @@ It registers no tools of its own — it inspects the `command` argument of shell
 
 ## Install
 
+Requires [pnpm](https://pnpm.io), which `dsh plugin` shells out to.
+
+**From npm:**
+
 ```
 dsh plugin --profile web add dsh-kubectl-guard
 ```
 
-Then add it to `~/.dsh/profiles/<profile>/cordis.patch.yml`:
+**From source**, if you want to hack on it:
+
+```
+git clone https://github.com/gengwg/dsh-kubectl-guard
+cd dsh-kubectl-guard
+dsh plugin --profile web add "$PWD"
+```
+
+Either way, activate it in `~/.dsh/profiles/<profile>/cordis.patch.yml`:
 
 ```yaml
 - insert:
     - id: kubectl-guard
       name: dsh-kubectl-guard
 ```
+
+Restart dsh to load it. Installing prints `declares no dsh.bundle — installed
+as a plain dependency`; that is expected, since this is a plugin activated by
+the patch entry above rather than a profile bundle.
 
 ## Examples
 
