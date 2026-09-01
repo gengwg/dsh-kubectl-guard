@@ -20,6 +20,63 @@ Then add it to `~/.dsh/profiles/<profile>/cordis.patch.yml`:
       name: dsh-kubectl-guard
 ```
 
+## Examples
+
+Nothing to invoke. Ask the agent to do its normal work; the guard sits in the
+tool pipeline and inspects the shell command before it runs.
+
+Blocked, with the cluster name replaced by a per-session pseudonym:
+
+```
+> delete the stuck nginx pod
+
+Error: kubectl-guard: 'delete' is irreversible and ctx#4be1 is not a local
+cluster. Denied.
+```
+
+Asked, so you approve it in the UI before it runs:
+
+```
+> roll out the new deployment
+
+kubectl-guard: 'apply' writes to ctx#4be1, which is not a local cluster.
+[approve] [deny]
+```
+
+Untouched, because reads are not gated:
+
+```
+> what pods are failing in kube-system?
+
+kubectl get pods -n kube-system --field-selector=status.phase!=Running
+NAME                   READY   STATUS             RESTARTS
+api-7d9f8c　            0/1     CrashLoopBackOff   14
+```
+
+Untouched, because the context is local:
+
+```
+> wipe the test namespace on my kind cluster
+
+kubectl --context kind-dev delete ns test
+namespace "test" deleted
+```
+
+Dry runs are reads, so they pass and give the agent a way to show you a change
+before asking for it:
+
+```
+kubectl apply --dry-run=server -f deploy.yaml     # allowed
+kubectl apply -f deploy.yaml                      # asks
+```
+
+Turn the guard off for one session without editing config:
+
+```
+dsh web --patch <(echo '- id: kubectl-guard
+  disabled: true')
+```
+
 ## Behavior
 
 | Command | Non-local context | Local context |
