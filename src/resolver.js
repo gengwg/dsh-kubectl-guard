@@ -5,7 +5,7 @@
 
 import { readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 
 const cache = new Map()
 
@@ -14,7 +14,7 @@ function primaryPath(explicit, env) {
   if (explicit) return explicit
   const fromEnv = env.KUBECONFIG
   if (fromEnv) {
-    const first = fromEnv.split(':').filter(Boolean)[0]
+    const first = fromEnv.split(delimiter).filter(Boolean)[0]
     if (first) return first
   }
   return join(homedir(), '.kube', 'config')

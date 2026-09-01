@@ -42,6 +42,13 @@ const cases = [
   ['apply --prune deletes, so deny',  'kubectl apply --prune -f d.yaml',           'deny'],
   ['replace --force deletes, so deny','kubectl replace --force -f d.yaml',         'deny'],
   ['plain replace only asks',         'kubectl replace -f d.yaml',                 'ask'],
+  ['auth can-i reads',                'kubectl auth can-i get pods',                'allow'],
+  ['auth reconcile writes RBAC',      'kubectl auth reconcile -f rbac.yaml',        'ask'],
+  // Variable indirection: the binary never appears as a bare token, so the
+  // parser must fall back to treating the whole command as opaque.
+  ['aliased binary via $VAR',         'K=kubectl; $K delete pod foo',               'deny'],
+  ['whole command in a variable',     'CMD="kubectl delete"; $CMD pod foo',         'deny'],
+  ['braced expansion is opaque too',  'kubectl ${VERB} pod foo',                    'ask'],
 ]
 
 for (const [title, command, expected] of cases) {

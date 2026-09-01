@@ -4,7 +4,7 @@
 // cannot confidently read is reported as ambiguous, and the caller treats
 // ambiguity as a mutation.
 
-const OPAQUE = [/\$\(/, /`/, /\beval\b/, /\bxargs\b/, /(^|\s)(ba)?sh\s+-c\b/]
+const OPAQUE = [/\$\{?[A-Za-z_]/, /\$\(/, /`/, /\beval\b/, /\bxargs\b/, /(^|\s)(ba)?sh\s+-c\b/]
 const OPERATORS = new Set(['&&', '||', '|', ';', '\n', '&'])
 
 /** Tokenize one command, honoring quotes so operators inside strings do not split it. */
@@ -76,7 +76,7 @@ function flag(tokens, name) {
 export function parseCommand(command, binaries) {
   const text = String(command ?? '')
   const mentionsBinary = [...binaries].some((b) =>
-    new RegExp(`(^|[\\s/;&|"'])${b}(\\s|$)`).test(text))
+    new RegExp(`(^|[^A-Za-z0-9_.-])${b}([^A-Za-z0-9_-]|$)`).test(text))
 
   const { tokens, unterminated } = tokenize(text)
   if (mentionsBinary && (unterminated || OPAQUE.some((re) => re.test(text)))) {
@@ -98,22 +98,23 @@ export function parseCommand(command, binaries) {
     if (head === undefined || !binaries.has(basename(head))) continue
 
     const rest = seg.slice(i + 1)
-    let verb
-    for (let j = 0; j < rest.length; j++) {
+    const positional = []
+    for (let j = 0; j < rest.length && positional.length < 2; j++) {
       const t = rest[j]
       if (t.startsWith('-')) {
         if (VALUE_FLAGS.has(t)) j++   // skip this flag's value
         continue
       }
-      verb = t
-      break
+      positional.push(t)
     }
+    const [verb, sub] = positional
     if (verb === undefined) { ambiguous = true; continue }
 
     const replicasRaw = flag(rest, '--replicas')
     const dryRun = flag(rest, '--dry-run')
     invocations.push({
       verb,
+      sub,
       context: flag(rest, '--context'),
       kubeconfig: flag(rest, '--kubeconfig'),
       replicas: replicasRaw === undefined ? undefined : Number(replicasRaw),

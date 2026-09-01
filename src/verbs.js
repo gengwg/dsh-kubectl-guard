@@ -28,6 +28,8 @@ export function tierOf(inv) {
   // `replace --force` is a delete followed by a create.
   if (inv.verb === 'apply' && inv.prune) return 'irreversible'
   if (inv.verb === 'replace' && inv.force) return 'irreversible'
+  // `auth can-i` reads, but `auth reconcile` writes RBAC objects.
+  if (inv.verb === 'auth' && inv.sub === 'reconcile') return 'reversible'
   if (REVERSIBLE.has(inv.verb)) return 'reversible'
   if (READ.has(inv.verb)) return 'read'
   return 'unknown'

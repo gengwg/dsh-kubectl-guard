@@ -21,7 +21,7 @@ export function decide(command, cfg, env = process.env) {
 
   if (ambiguous) {
     const hitsIrreversible = [...IRREVERSIBLE].some((v) =>
-      new RegExp(`(^|\\s)${v}(\\s|$)`).test(command))
+      new RegExp(`(^|[^A-Za-z0-9_-])${v}([^A-Za-z0-9_-]|$)`).test(command))
     take(hitsIrreversible
       ? { action: 'deny', reason: 'kubectl-guard: command could not be parsed with confidence and contains an irreversible verb; refusing rather than guessing. Run it yourself if you intend it.' }
       : { action: 'ask', reason: 'kubectl-guard: command could not be parsed with confidence and may mutate a cluster.' })

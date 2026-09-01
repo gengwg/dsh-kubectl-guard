@@ -98,6 +98,8 @@ dsh web --patch <(echo '- id: kubectl-guard
 | Command | Non-local context | Local context |
 |---|---|---|
 | `get`, `describe`, `logs`, `top` | allow | allow |
+| `auth can-i` | allow | allow |
+| `auth reconcile` | ask | allow |
 | `apply`, `patch`, `scale`, `exec` | ask | allow |
 | `delete`, `drain`, `evict` | deny | allow |
 | `scale --replicas=0` | deny | allow |
@@ -128,6 +130,20 @@ config:
 ## Failing closed
 
 A gate that can be talked around is worse than none. Anything unparseable — `sh -c`, command substitution, an unterminated quote — is treated as a mutation: denied if the text contains an irreversible verb, asked otherwise. An unknown verb asks rather than allows.
+
+## What this is not
+
+This gates a cooperative agent, not an adversary. It reads the command string
+the agent asked to run, so anything that hides the binary name from that string
+defeats it by construction -- `$KUBECTL delete ...` with the name only in the
+environment, a shell alias resolved at runtime, a base64 round-trip.
+
+Indirection that still contains the literal name is caught: `K=kubectl; $K
+delete pod foo` is denied, because any `$` expansion alongside a mention of a
+guarded binary makes the command opaque, and opaque plus an irreversible verb
+is a denial. But treat the guard as a seatbelt against a confused agent, not a
+sandbox against a hostile one. If you need the stronger property, take the
+credential away rather than filtering the command.
 
 ## Limitations
 
