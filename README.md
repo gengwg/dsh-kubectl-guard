@@ -49,8 +49,8 @@ Untouched, because reads are not gated:
 > what pods are failing in kube-system?
 
 kubectl get pods -n kube-system --field-selector=status.phase!=Running
-NAME                   READY   STATUS             RESTARTS
-api-7d9f8c                    0/1     CrashLoopBackOff   14
+NAME         READY   STATUS             RESTARTS
+api-7d9f8c   0/1     CrashLoopBackOff   14
 ```
 
 Untouched, because the context is local:
