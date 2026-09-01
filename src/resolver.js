@@ -54,8 +54,10 @@ function currentContext(path) {
  */
 export function resolveContext(inv, env = process.env) {
   if (inv.context) return { context: inv.context, source: 'flag' }
+  // An inline assignment on the same command line wins over the ambient value.
+  const effective = { ...env, ...(inv.env ?? {}) }
   return {
-    context: currentContext(primaryPath(inv.kubeconfig, env)),
+    context: currentContext(primaryPath(inv.kubeconfig, effective)),
     source: 'kubeconfig',
   }
 }

@@ -10,7 +10,7 @@ const Config = z.object({
     .description('Context names treated as safe. `*` globs. Everything else is production.'),
   binaries: z.array(z.string()).default(['kubectl', 'k'])
     .description('Command basenames to inspect.'),
-  guardedTools: z.array(z.string()).default(['bash'])
+  guardedTools: z.array(z.string()).default(['bash', 'pwsh'])
     .description('Tool names whose `command` argument is inspected.'),
   showContextNames: z.boolean().default(false)
     .description('Send real context names to the model instead of a per-session pseudonym.'),

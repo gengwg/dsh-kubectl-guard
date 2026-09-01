@@ -101,9 +101,17 @@ dsh web --patch <(echo '- id: kubectl-guard
 | `apply`, `patch`, `scale`, `exec` | ask | allow |
 | `delete`, `drain`, `evict` | deny | allow |
 | `scale --replicas=0` | deny | allow |
+| `apply --prune` | deny | allow |
+| `replace --force` | deny | allow |
 | `apply --dry-run=server` | allow | allow |
 
 A context is local only if it matches `localContexts`. Everything else, including a kubeconfig that cannot be read, is treated as production.
+
+The context is resolved the way the shell would resolve it: an explicit
+`--context` wins, then `--kubeconfig`, then a `KUBECONFIG=` assignment written
+inline on the same command line, then the ambient environment. That last case
+matters -- without it, `KUBECONFIG=/path/to/prod kubectl delete ...` would be
+judged against whatever your shell happened to point at.
 
 ## Config
 
@@ -111,7 +119,7 @@ A context is local only if it matches `localContexts`. Everything else, includin
 config:
   localContexts: [minikube, 'kind-*', docker-desktop]
   binaries: [kubectl, k]
-  guardedTools: [bash]
+  guardedTools: [bash, pwsh]
   showContextNames: false
 ```
 

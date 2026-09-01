@@ -88,7 +88,12 @@ export function parseCommand(command, binaries) {
 
   for (const seg of segments(tokens)) {
     let i = 0
-    while (i < seg.length && isEnvAssignment(seg[i])) i++
+    const env = {}
+    while (i < seg.length && isEnvAssignment(seg[i])) {
+      const eq = seg[i].indexOf('=')
+      env[seg[i].slice(0, eq)] = seg[i].slice(eq + 1)
+      i++
+    }
     const head = seg[i]
     if (head === undefined || !binaries.has(basename(head))) continue
 
@@ -114,6 +119,11 @@ export function parseCommand(command, binaries) {
       replicas: replicasRaw === undefined ? undefined : Number(replicasRaw),
       // `--dry-run` with no value is the deprecated bare form, still a dry run.
       dryRun: rest.includes('--dry-run') ? 'client' : dryRun,
+      prune: rest.includes('--prune'),
+      force: rest.includes('--force'),
+      // Inline `KUBECONFIG=... kubectl ...` overrides the ambient environment,
+      // exactly as the shell would apply it.
+      env,
     })
   }
 

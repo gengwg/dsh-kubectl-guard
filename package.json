@@ -1,6 +1,6 @@
 {
   "name": "dsh-kubectl-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A dsh policy plugin that gates kubectl writes by kubeconfig context: hard-deny irreversible verbs outside local clusters, ask for the rest.",
   "type": "module",
   "main": "src/index.js",

@@ -39,6 +39,9 @@ const cases = [
   ['command substitution asks',       'kubectl apply -f $(mktemp)',                'ask'],
   ['unknown verb asks',               'kubectl frobnicate widget',                 'ask'],
   ['chained: worst wins',             'kubectl get po && kubectl delete po x',     'deny'],
+  ['apply --prune deletes, so deny',  'kubectl apply --prune -f d.yaml',           'deny'],
+  ['replace --force deletes, so deny','kubectl replace --force -f d.yaml',         'deny'],
+  ['plain replace only asks',         'kubectl replace -f d.yaml',                 'ask'],
 ]
 
 for (const [title, command, expected] of cases) {
@@ -66,4 +69,21 @@ test('opt-in reveals the real name', () => {
   _clearCache()
   const { reason } = decide('kubectl delete pod x', { ...cfg, showContextNames: true }, env)
   assert.ok(reason.includes(PROD_CONTEXT))
+})
+
+test('inline KUBECONFIG cannot smuggle a production context past a local shell', () => {
+  _clearCache()
+  const localConfig = join(dir, 'local')
+  writeFileSync(localConfig, 'apiVersion: v1\nkind: Config\ncurrent-context: minikube\n')
+  // Ambient env points somewhere harmless; the command redirects it inline.
+  const verdict = decide(`KUBECONFIG=${kubeconfig} kubectl delete pod x`, cfg, { KUBECONFIG: localConfig })
+  assert.equal(verdict.action, 'deny')
+})
+
+test('inline KUBECONFIG pointing at a local cluster is still exempt', () => {
+  _clearCache()
+  const localConfig = join(dir, 'local2')
+  writeFileSync(localConfig, 'apiVersion: v1\nkind: Config\ncurrent-context: minikube\n')
+  const verdict = decide(`KUBECONFIG=${localConfig} kubectl delete pod x`, cfg, { KUBECONFIG: kubeconfig })
+  assert.equal(verdict.action, 'allow')
 })

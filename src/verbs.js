@@ -24,6 +24,10 @@ export const READ = new Set([
 export function tierOf(inv) {
   if (IRREVERSIBLE.has(inv.verb)) return 'irreversible'
   if (inv.verb === 'scale' && inv.replicas === 0) return 'irreversible'
+  // `apply --prune` deletes resources absent from the manifest set, and
+  // `replace --force` is a delete followed by a create.
+  if (inv.verb === 'apply' && inv.prune) return 'irreversible'
+  if (inv.verb === 'replace' && inv.force) return 'irreversible'
   if (REVERSIBLE.has(inv.verb)) return 'reversible'
   if (READ.has(inv.verb)) return 'read'
   return 'unknown'
