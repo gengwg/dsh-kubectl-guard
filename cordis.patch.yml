@@ -1,0 +1,3 @@
+- insert:
+    - id: kubectl-guard
+      name: dsh-kubectl-guard
