@@ -8,7 +8,8 @@
     ".": "./src/index.js"
   },
   "files": [
-    "src"
+    "src",
+    "cordis.patch.yml"
   ],
   "license": "MIT",
   "scripts": {
