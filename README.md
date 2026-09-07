@@ -1,5 +1,7 @@
 # dsh-kubectl-guard
 
+[![Awesome](https://awesome.re/badge.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) policy plugin that gates `kubectl` by kubeconfig context.
 
 Irreversible verbs against a non-local cluster are denied outright. Recoverable writes ask first. Reads and local clusters are untouched.
