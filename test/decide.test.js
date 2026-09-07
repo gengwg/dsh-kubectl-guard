@@ -49,6 +49,22 @@ const cases = [
   ['aliased binary via $VAR',         'K=kubectl; $K delete pod foo',               'deny'],
   ['whole command in a variable',     'CMD="kubectl delete"; $CMD pod foo',         'deny'],
   ['braced expansion is opaque too',  'kubectl ${VERB} pod foo',                    'ask'],
+  // pflag applies the LAST occurrence of a repeated flag; the parser must too.
+  ['last --dry-run wins',             'kubectl apply -f d.yaml --dry-run=client --dry-run=none', 'ask'],
+  ['last --context wins',             'kubectl delete pod x --context minikube --context prod-eu', 'deny'],
+  ['last --replicas wins',            'kubectl scale deploy/web --replicas=3 --replicas=0', 'deny'],
+  // pflag stops at `--`: later tokens are the remote command, not kubectl flags.
+  ['flags after -- are not kubectl flags', 'kubectl exec prod-pod -- ./runbook.sh --dry-run', 'ask'],
+  ['context after -- does not exempt', 'kubectl exec prod-pod -- ./migrate.sh --context minikube', 'ask'],
+  // `use-context` retargets the session, so it asks even against a local
+  // ambient context — and a chained delete then asks as well.
+  ['use-context asks',                'kubectl config use-context prod-eu',         'ask'],
+  ['config view still reads',         'kubectl config view',                        'allow'],
+  // `use-context` retargets the session, so it asks even against a local
+  // ambient context — see the dedicated chain test below, which needs a local
+  // kubeconfig to prove the delete no longer slips through pre-switch.
+  // --server/--token bypass the kubeconfig, so its context vouches for nothing.
+  ['--server cannot hide behind local kubeconfig', 'kubectl --server https://10.0.0.5:6443 --token t delete pod x', 'deny'],
 ]
 
 for (const [title, command, expected] of cases) {
@@ -76,6 +92,17 @@ test('opt-in reveals the real name', () => {
   _clearCache()
   const { reason } = decide('kubectl delete pod x', { ...cfg, showContextNames: true }, env)
   assert.ok(reason.includes(PROD_CONTEXT))
+})
+
+test('use-context chain: delete resolved pre-switch no longer slips through', () => {
+  _clearCache()
+  const localConfig = join(dir, 'local-chain')
+  writeFileSync(localConfig, 'apiVersion: v1\nkind: Config\ncurrent-context: minikube\n')
+  // Ambient context is local: pre-fix, the delete was judged against minikube
+  // and allowed, while at runtime the switch happens first. Now use-context
+  // itself asks, surfacing the whole chain for approval.
+  const verdict = decide('kubectl config use-context prod-eu && kubectl delete pod x', cfg, { KUBECONFIG: localConfig })
+  assert.equal(verdict.action, 'ask')
 })
 
 test('inline KUBECONFIG cannot smuggle a production context past a local shell', () => {

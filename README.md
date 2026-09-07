@@ -102,6 +102,7 @@ dsh web --patch <(echo '- id: kubectl-guard
 | `get`, `describe`, `logs`, `top` | allow | allow |
 | `auth can-i` | allow | allow |
 | `auth reconcile` | ask | allow |
+| `config use-context`, other mutating `config` subcommands | ask | ask |
 | `apply`, `patch`, `scale`, `exec` | ask | allow |
 | `delete`, `drain`, `evict` | deny | allow |
 | `scale --replicas=0` | deny | allow |

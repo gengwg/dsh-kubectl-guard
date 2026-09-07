@@ -29,12 +29,20 @@ export function decide(command, cfg, env = process.env) {
 
   for (const inv of invocations) {
     const { context } = resolveContext(inv, env)
-    if (classify(context, cfg.localContexts) === 'local') continue
-
-    const where = label(context, cfg.showContextNames)
     const tier = isDryRun(inv) ? 'read' : tierOf(inv)
 
     if (tier === 'read') continue
+    // config mutations rewrite the kubeconfig itself, retargeting later
+    // commands in the session, so the local-context exemption cannot cover
+    // them: they ask regardless of where the ambient context points.
+    if (inv.verb === 'config') {
+      const what = inv.sub ? `config ${inv.sub}` : 'config'
+      take({ action: 'ask', context, reason: `kubectl-guard: '${what}' rewrites the kubeconfig, which retargets later commands. Review the full command line before approving.` })
+      continue
+    }
+    if (classify(context, cfg.localContexts) === 'local') continue
+
+    const where = label(context, cfg.showContextNames)
     if (tier === 'irreversible') {
       take({ action: 'deny', context, reason: `kubectl-guard: '${inv.verb}' is irreversible and ${where} is not a local cluster. Denied.` })
     } else {

@@ -58,14 +58,19 @@ const VALUE_FLAGS = new Set([
 const basename = (p) => p.split('/').pop() ?? p
 const isEnvAssignment = (t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t)
 
-/** Read `--flag value` or `--flag=value` from a token list. */
+/**
+ * Read `--flag value` or `--flag=value` from a token list. pflag applies the
+ * LAST occurrence of a repeated flag, so we keep scanning: reading the first
+ * would let `--dry-run=client --dry-run=none` pass as a dry run.
+ */
 function flag(tokens, name) {
+  let value
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === name) return tokens[i + 1]
-    if (t.startsWith(`${name}=`)) return t.slice(name.length + 1)
+    if (t === name) { value = tokens[i + 1]; i++; continue }
+    if (t.startsWith(`${name}=`)) value = t.slice(name.length + 1)
   }
-  return undefined
+  return value
 }
 
 /**
@@ -97,7 +102,11 @@ export function parseCommand(command, binaries) {
     const head = seg[i]
     if (head === undefined || !binaries.has(basename(head))) continue
 
-    const rest = seg.slice(i + 1)
+    // pflag stops flag parsing at `--`; for exec/cp, everything after it is
+    // the remote command line, not kubectl flags.
+    const afterDashDash = seg.slice(i + 1)
+    const dd = afterDashDash.indexOf('--')
+    const rest = dd === -1 ? afterDashDash : afterDashDash.slice(0, dd)
     const positional = []
     for (let j = 0; j < rest.length && positional.length < 2; j++) {
       const t = rest[j]
@@ -117,6 +126,9 @@ export function parseCommand(command, binaries) {
       sub,
       context: flag(rest, '--context'),
       kubeconfig: flag(rest, '--kubeconfig'),
+      // --server/--token bypass the kubeconfig entirely; any context the
+      // resolver reads would describe the wrong cluster, so report none.
+      serverOverride: flag(rest, '--server') !== undefined || flag(rest, '--token') !== undefined,
       replicas: replicasRaw === undefined ? undefined : Number(replicasRaw),
       // `--dry-run` with no value is the deprecated bare form, still a dry run.
       dryRun: rest.includes('--dry-run') ? 'client' : dryRun,
