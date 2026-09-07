@@ -65,6 +65,13 @@ const cases = [
   // kubeconfig to prove the delete no longer slips through pre-switch.
   // --server/--token bypass the kubeconfig, so its context vouches for nothing.
   ['--server cannot hide behind local kubeconfig', 'kubectl --server https://10.0.0.5:6443 --token t delete pod x', 'deny'],
+  // A binary mentioned in a non-head position mutates nothing.
+  ['mention in grep is not gated',    'grep -rn "kubectl delete" runbooks/',  'allow'],
+  ['mention in echo is not gated',    'echo "run kubectl delete carefully"',  'allow'],
+  // Pass-through wrappers are seen through.
+  ['sudo delete denies',              'sudo kubectl delete pod x',            'deny'],
+  ['sudo -u form denies',             'sudo -u root kubectl delete pod x',    'deny'],
+  ['time apply asks',                 'time kubectl apply -f d.yaml',         'ask'],
 ]
 
 for (const [title, command, expected] of cases) {
@@ -84,7 +91,7 @@ test('context name never reaches model-facing text by default', () => {
   for (const command of ['kubectl delete pod x', 'kubectl apply -f d.yaml']) {
     const { reason } = decide(command, cfg, env)
     assert.ok(!reason.includes(PROD_CONTEXT), `leaked context name in: ${reason}`)
-    assert.match(reason, /ctx#[0-9a-f]{4}/)
+    assert.match(reason, /ctx#[0-9a-f]{8}/)
   }
 })
 

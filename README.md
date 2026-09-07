@@ -48,7 +48,7 @@ Blocked, with the cluster name replaced by a per-session pseudonym:
 ```
 > delete the stuck nginx pod
 
-Error: kubectl-guard: 'delete' is irreversible and ctx#4be1 is not a local
+Error: kubectl-guard: 'delete' is irreversible and ctx#4be1f92a is not a local
 cluster. Denied.
 ```
 
@@ -57,7 +57,7 @@ Asked, so you approve it in the UI before it runs:
 ```
 > roll out the new deployment
 
-kubectl-guard: 'apply' writes to ctx#4be1, which is not a local cluster.
+kubectl-guard: 'apply' writes to ctx#4be1f92a, which is not a local cluster.
 [approve] [deny]
 ```
 
@@ -128,7 +128,7 @@ config:
   showContextNames: false
 ```
 
-`showContextNames` is off by default: blocked-command messages go to the model, and therefore to the LLM provider. With it off the model sees a stable per-session pseudonym like `ctx#4be1` instead of your cluster's name.
+`showContextNames` is off by default: blocked-command messages go to the model, and therefore to the LLM provider. With it off the model sees a stable per-session pseudonym like `ctx#4be1f92a` instead of your cluster's name.
 
 ## Failing closed
 
@@ -151,6 +151,7 @@ credential away rather than filtering the command.
 ## Limitations
 
 - Only `kubectl`. helm, argocd and flux are not covered; the verb table is data, so adding them is an edit to `src/verbs.js`.
+- Pass-through wrappers (`sudo`, `time`, `nice`, ...) are seen through, but only until a bare-token wrapper argument: `timeout 30 kubectl delete ...` is not gated, because `30` ends the wrapper chain.
 - `current-context` is read with a line-anchored regex, not a YAML parser. Unreadable or unmatched means production, so the failure direction is safe.
 - The pseudonym salt is per-process: ids are stable within a session, not across restarts.
 - Guards are synchronous, so the deny path does no I/O beyond a cached `readFileSync`.

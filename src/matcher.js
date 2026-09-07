@@ -57,6 +57,16 @@ const VALUE_FLAGS = new Set([
 
 const basename = (p) => p.split('/').pop() ?? p
 const isEnvAssignment = (t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t)
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// Wrappers that prepend a command without changing what it does. Seeing one
+// as a segment head means "keep looking", not "give up".
+const WRAPPERS = new Set(['time', 'nice', 'nohup', 'sudo', 'doas', 'command', 'builtin', 'exec', 'stdbuf', 'setsid', 'chrt', 'ionice', 'taskset', 'timeout', 'xargs'])
+
+// Wrapper flags that consume the following token, so the value is not
+// mistaken for the command (`sudo -u root kubectl ...`). Most wrapper flags
+// take no value (-n, -p, -v, --signal, --preserve-env, ...); these do.
+const WRAPPER_VALUE_FLAGS = new Set(['-n', '--nice', '-u', '--user', '-g', '--group', '-C', '--chdir'])
 
 /**
  * Read `--flag value` or `--flag=value` from a token list. pflag applies the
@@ -81,7 +91,7 @@ function flag(tokens, name) {
 export function parseCommand(command, binaries) {
   const text = String(command ?? '')
   const mentionsBinary = [...binaries].some((b) =>
-    new RegExp(`(^|[^A-Za-z0-9_.-])${b}([^A-Za-z0-9_-]|$)`).test(text))
+    new RegExp(`(^|[^A-Za-z0-9_.-])${escapeRe(b)}([^A-Za-z0-9_-]|$)`).test(text))
 
   const { tokens, unterminated } = tokenize(text)
   if (mentionsBinary && (unterminated || OPAQUE.some((re) => re.test(text)))) {
@@ -98,6 +108,20 @@ export function parseCommand(command, binaries) {
       const eq = seg[i].indexOf('=')
       env[seg[i].slice(0, eq)] = seg[i].slice(eq + 1)
       i++
+    }
+    // See through pass-through wrappers (`sudo kubectl ...`, `time k ...`).
+    // Flags are skipped (WRAPPER_VALUE_FLAGS consume one value); the scan
+    // stops at the first bare token, which is the command — or another
+    // wrapper, continuing the chain. A wrapper argument that is a bare token
+    // (`timeout 30 ...`) ends the chain and the segment is skipped: a gap,
+    // but a fail-open one only for that specific composition.
+    while (i < seg.length && WRAPPERS.has(basename(seg[i]))) {
+      i++
+      while (i < seg.length && seg[i].startsWith('-')) {
+        if (WRAPPER_VALUE_FLAGS.has(seg[i])) i++   // skip this flag's value
+        i++
+      }
+      while (i < seg.length && isEnvAssignment(seg[i])) i++
     }
     const head = seg[i]
     if (head === undefined || !binaries.has(basename(head))) continue
@@ -140,6 +164,16 @@ export function parseCommand(command, binaries) {
     })
   }
 
-  if (mentionsBinary && invocations.length === 0 && !ambiguous) ambiguous = true
+  // A bare binary token as a segment head that yielded no invocation is
+  // opaque. A mere mention in a non-head position (`grep -rn "kubectl
+  // delete" runbooks/`) is not — reading about kubectl mutates nothing.
+  if (!ambiguous && invocations.length === 0) {
+    const bareHead = segments(tokens).some((seg) => {
+      let i = 0
+      while (i < seg.length && isEnvAssignment(seg[i])) i++
+      return i < seg.length && binaries.has(basename(seg[i]))
+    })
+    if (bareHead) ambiguous = true
+  }
   return { invocations, ambiguous }
 }

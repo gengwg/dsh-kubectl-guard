@@ -8,6 +8,9 @@ import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
 
 const cache = new Map()
+// Keys carry mtime+size, so every kubeconfig rewrite adds an entry. Bound it;
+// a full clear is fine since the next read just repopulates.
+const CACHE_MAX = 64
 
 /** KUBECONFIG may list several files; the first one owns current-context. */
 function primaryPath(explicit, env) {
@@ -43,6 +46,7 @@ function currentContext(path) {
   } catch {
     value = null
   }
+  if (cache.size >= CACHE_MAX) cache.clear()
   cache.set(key, value)
   return value
 }

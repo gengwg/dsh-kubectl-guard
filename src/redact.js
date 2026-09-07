@@ -12,7 +12,7 @@ const salt = randomBytes(16)
 export function pseudonym(context) {
   if (!context) return 'ctx#unresolved'
   const h = createHash('sha256').update(salt).update(context).digest('hex')
-  return `ctx#${h.slice(0, 4)}`
+  return `ctx#${h.slice(0, 8)}`
 }
 
 /** @param {boolean} reveal when true, show the real name (opt-in). */
