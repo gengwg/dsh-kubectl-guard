@@ -26,17 +26,12 @@ cd dsh-kubectl-guard
 dsh plugin --profile web add "$PWD"
 ```
 
-Either way, activate it in `~/.dsh/profiles/<profile>/cordis.patch.yml`:
+Either way, activation is automatic: the package declares `dsh.bundle`, so
+`dsh plugin add` joins it to the profile's bundle stack. Restart dsh to load it.
 
-```yaml
-- insert:
-    - id: kubectl-guard
-      name: dsh-kubectl-guard
-```
-
-Restart dsh to load it. Installing prints `declares no dsh.bundle — installed
-as a plain dependency`; that is expected, since this is a plugin activated by
-the patch entry above rather than a profile bundle.
+Upgrading from 0.1.x, which installed as a plain dependency: delete the manual
+insert entry from `~/.dsh/profiles/<profile>/cordis.patch.yml`. Bundle and user
+patch layers both apply, so leaving it in loads the guard twice.
 
 ## Examples
 
