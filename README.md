@@ -1,6 +1,8 @@
 # dsh-kubectl-guard
 
 [![Awesome](https://awesome.re/badge.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+[![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/gengwg/dsh-kubectl-guard)
+[![npm](https://img.shields.io/npm/v/dsh-kubectl-guard.svg)](https://www.npmjs.com/package/dsh-kubectl-guard)
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) policy plugin that gates `kubectl` by kubeconfig context.
 
