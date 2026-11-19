@@ -8,4 +8,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      # The wiring test imports src/index.js, which needs the declared peer dependencies.
+      - run: npm install --no-save --no-audit --no-fund
       - run: npm test

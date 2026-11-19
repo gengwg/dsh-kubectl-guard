@@ -2,9 +2,9 @@
 
 ## Validation and coverage
 
-- Use Node `>=20` as declared in `package.json`. Run `npm test`, which executes `node --test test/*.test.js`; CI runs the same script on **Node 22** via `.github/workflows/test.yml`.
+- Use Node `>=20` as declared in `package.json`. Run `npm test`, which executes `node --test test/*.test.js`; CI runs the same script on **Node 22** via `.github/workflows/test.yml`, after `npm install` pulls the declared peer dependencies that `test/index.test.js` needs.
 - Tests must remain offline: use synthetic context names, temporary synthetic kubeconfigs, and explicitly injected environment objects. Do not read a developer's real kubeconfig or contact/run against a live cluster.
-- `test/decide.test.js` currently tests `decide()` only; it does **not** cover Cordis registration, hook ordering, guarded-tool filtering, or return-value mapping in `src/index.js`. Add isolated Cordis-hook tests with fakes/doubles when changing that wiring; a passing decision table alone does not verify the plugin is enforced.
+- `test/decide.test.js` covers `decide()`; `test/index.test.js` covers Cordis registration, hook ordering, guarded-tool filtering, and return-value mapping in `src/index.js` with fakes. Extend the isolated Cordis-hook tests when changing that wiring; a passing decision table alone does not verify the plugin is enforced.
 
 ## Decision flow and invariants
 
