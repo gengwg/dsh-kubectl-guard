@@ -134,16 +134,20 @@ test('a chained apply and delete remains deny after pre-execute', async () => {
   assert.match(final, /'delete' is irreversible/)
 })
 
+let chats = 0
+// A dsh Session as the guard sees it: a header with an id, plus origin and
+// parentSession when a subagent started it.
+const chat = (parent) => ({ header: { id: `session-${++chats}`, ...(parent ? { origin: 'subagent', parentSession: parent.header.id } : {}) } })
 const del = (session) => exec(prod('kubectl delete pod web-1'), 'bash', session)
 const read = (session) => exec(prod('kubectl get pods'), 'bash', session)
 
 test('three denials in a row halt kubectl for that session, reads included', async () => {
   const { guards, preExecute } = cordis()
-  const session = {}
+  const session = chat()
   assert.match(guards[0](del(session)), /Denied\.$/)
   assert.match(guards[0](del(session)), /Denied\.$/)
-  assert.match(guards[0](del(session)), /halted for this session/)
-  assert.match(guards[0](read(session)), /halted for this session/)
+  assert.match(guards[0](del(session)), /halted for this chat/)
+  assert.match(guards[0](read(session)), /halted for this chat/)
   // A halted session gets no approval prompt; the guard refuses instead.
   assert.equal(await preExecute[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session), next), delegated)
   assert.match(guards[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session)), /halted/)
@@ -151,7 +155,7 @@ test('three denials in a row halt kubectl for that session, reads included', asy
 
 test('an allowed kubectl command resets the denial count', () => {
   const { guards } = cordis()
-  const session = {}
+  const session = chat()
   guards[0](del(session)); guards[0](del(session))
   assert.equal(guards[0](read(session)), undefined)
   guards[0](del(session)); guards[0](del(session))
@@ -160,15 +164,15 @@ test('an allowed kubectl command resets the denial count', () => {
 
 test('non-kubectl commands neither count nor reset the denials', () => {
   const { guards } = cordis()
-  const session = {}
+  const session = chat()
   guards[0](del(session)); guards[0](del(session))
   assert.equal(guards[0](exec('echo hi', 'bash', session)), undefined)
-  assert.match(guards[0](del(session)), /halted for this session/)
+  assert.match(guards[0](del(session)), /halted for this chat/)
 })
 
 test('the halt is per session', () => {
   const { guards } = cordis()
-  const a = {}, b = {}
+  const a = chat(), b = chat()
   for (let i = 0; i < 3; i++) guards[0](del(a))
   assert.match(guards[0](read(a)), /halted/)
   assert.equal(guards[0](read(b)), undefined)
@@ -176,7 +180,7 @@ test('the halt is per session', () => {
 
 test('haltAfterDenials 0 turns the halt off', () => {
   const { guards } = cordis({ haltAfterDenials: 0 })
-  const session = {}
+  const session = chat()
   for (let i = 0; i < 5; i++) assert.match(guards[0](del(session)), /Denied\.$/)
   assert.equal(guards[0](read(session)), undefined)
 })
@@ -184,7 +188,7 @@ test('haltAfterDenials 0 turns the halt off', () => {
 test('the decision log records allow, ask and deny without the context name or command', async () => {
   const log = join(dir, 'decisions.jsonl')
   const { guards, preExecute } = cordis({ decisionLog: log })
-  const session = {}
+  const session = chat()
   guards[0](exec(prod('kubectl get pods --token=s3cr3t'), 'bash', session))
   await preExecute[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session), next)
   guards[0](del(session))
@@ -195,4 +199,41 @@ test('the decision log records allow, ask and deny without the context name or c
   assert.ok(entries.every((e) => typeof e.at === 'string'))
   assert.ok(!text.includes(PROD_CONTEXT), text)
   assert.ok(!text.includes('s3cr3t'), text)
+})
+
+test('a subagent of a halted chat is halted too', () => {
+  const { guards } = cordis()
+  const parent = chat()
+  for (let i = 0; i < 3; i++) guards[0](del(parent))
+  const helper = chat(parent)
+  assert.match(guards[0](read(helper)), /halted/)
+  // So is a helper's helper, once the middle one has made any call.
+  guards[0](exec('echo starting', 'bash', helper))
+  assert.match(guards[0](read(chat(helper))), /halted/)
+})
+
+test('denials in subagents count toward the chat that started them', () => {
+  const { guards } = cordis()
+  const parent = chat()
+  const helper = chat(parent)
+  guards[0](exec('echo hi', 'bash', helper))
+  guards[0](del(parent))
+  guards[0](del(helper))
+  assert.match(guards[0](del(chat(helper))), /halted for this chat/)
+  assert.match(guards[0](read(parent)), /halted/)
+  assert.equal(guards[0](read(chat())), undefined)
+})
+
+test('a fork the user made is its own chat', () => {
+  const { guards } = cordis()
+  const original = chat()
+  for (let i = 0; i < 3; i++) guards[0](del(original))
+  const userFork = { header: { id: 'user-fork', parentSession: original.header.id } }
+  assert.equal(guards[0](read(userFork)), undefined)
+})
+
+test('calls without an agent session share one count', () => {
+  const { guards } = cordis()
+  for (let i = 0; i < 3; i++) guards[0](del())
+  assert.match(guards[0](read()), /halted/)
 })

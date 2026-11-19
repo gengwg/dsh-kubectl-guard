@@ -131,7 +131,7 @@ config:
 
 `showContextNames` is off by default: blocked-command messages go to the model, and therefore to the LLM provider. With it off the model sees a stable per-session pseudonym like `ctx#4be1f92a` instead of your cluster's name.
 
-`haltAfterDenials`: after this many kubectl denials in a row, the guard refuses every kubectl command for the rest of that session, reads included, and tells the agent to stop and ask you. An agent that keeps trying variants after a refusal is routing around the guard. An allowed or approved kubectl command resets the count; other shell commands don't affect it. Set `0` to turn the halt off. Start a new session to clear a halt.
+`haltAfterDenials`: after this many kubectl denials in a row, the guard refuses every kubectl command for the rest of that chat, reads included, and tells the agent to stop and ask you. An agent that keeps trying variants after a refusal is routing around the guard. Subagents count toward the chat that started them and are halted with it, so delegating doesn't start a fresh count. A fork you make yourself is a separate chat. An allowed or approved kubectl command resets the count; other shell commands don't affect it. Set `0` to turn the halt off. Start a new chat to clear a halt.
 
 `decisionLog`: a file path to append one JSON line per kubectl decision (`at`, `action`, `verbs`, `reason`). It records the verbs and the model-facing reason, which uses the pseudonym, never the command line, since a command can carry tokens. Empty, the default, writes nothing.
 
