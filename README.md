@@ -6,7 +6,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) policy plugin that gates `kubectl` by kubeconfig context.
 
-Irreversible verbs against a non-local cluster are denied outright. Recoverable writes ask first. Reads and local clusters are untouched.
+Irreversible verbs against a non-local cluster are denied outright. Recoverable writes ask first. Reads that would print secret values or raw kubeconfig credentials ask too, because command output is sent to the model provider. Other reads and local clusters are untouched.
 
 It registers no tools of its own — it inspects the `command` argument of shell tool calls, so it covers whatever the agent runs.
 
@@ -58,7 +58,7 @@ kubectl-guard: 'apply' writes to ctx#4be1f92a, which is not a local cluster.
 [approve] [deny]
 ```
 
-Untouched, because reads are not gated:
+Untouched, because plain reads are not gated (`get secret` with `-o yaml` asks, since it prints the values):
 
 ```
 > what pods are failing in kube-system?
@@ -97,6 +97,8 @@ dsh web --patch <(echo '- id: kubectl-guard
 | Command | Non-local context | Local context |
 |---|---|---|
 | `get`, `describe`, `logs`, `top` | allow | allow |
+| `get secret` with `-o yaml`, `json`, `jsonpath` or a template; `get --raw` on a secrets path | ask | allow |
+| `config view --raw` | ask | ask |
 | `auth can-i` | allow | allow |
 | `auth reconcile` | ask | allow |
 | `config use-context`, other mutating `config` subcommands | ask | ask |
@@ -149,6 +151,7 @@ credential away rather than filtering the command.
 
 - Only `kubectl`. helm, argocd and flux are not covered; the verb table is data, so adding them is an edit to `src/verbs.js`.
 - Pass-through wrappers (`sudo`, `time`, `nice`, ...) are seen through, but only until a bare-token wrapper argument: `timeout 30 kubectl delete ...` is not gated, because `30` ends the wrapper chain.
+- Secret reads are recognized by the resource names on the command line. `get -f manifests/ -o yaml` prints any Secret the manifests name without asking, and so does `exec` into a pod that mounts one (though `exec` asks as a write).
 - `current-context` is read with a line-anchored regex, not a YAML parser. Unreadable or unmatched means production, so the failure direction is safe.
 - The pseudonym salt is per-process: ids are stable within a session, not across restarts.
 - Guards are synchronous, so the deny path does no I/O beyond a cached `readFileSync`.

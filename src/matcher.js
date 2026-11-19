@@ -84,6 +84,23 @@ function flag(tokens, name) {
 }
 
 /**
+ * Read the output format. Besides `-o X`, `-o=X` and `--output X`, pflag takes
+ * the shorthand with its value attached (`-oyaml`) or after boolean
+ * shorthands (`-Ao yaml`). Last occurrence wins, as in `flag()`.
+ */
+function outputFormat(tokens) {
+  let value
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t === '--output') { value = tokens[++i]; continue }
+    if (t.startsWith('--output=')) { value = t.slice('--output='.length); continue }
+    const short = /^-[A-Za-z]*?o(.*)$/.exec(t)
+    if (short) value = short[1] === '' ? tokens[++i] : short[1].replace(/^=/, '')
+  }
+  return value
+}
+
+/**
  * @param {string} command raw shell command as the model wrote it
  * @param {Set<string>} binaries guarded binary basenames, e.g. kubectl, k
  * @returns {{invocations: object[], ambiguous: boolean}}
@@ -132,7 +149,7 @@ export function parseCommand(command, binaries) {
     const dd = afterDashDash.indexOf('--')
     const rest = dd === -1 ? afterDashDash : afterDashDash.slice(0, dd)
     const positional = []
-    for (let j = 0; j < rest.length && positional.length < 2; j++) {
+    for (let j = 0; j < rest.length; j++) {
       const t = rest[j]
       if (t.startsWith('-')) {
         if (VALUE_FLAGS.has(t)) j++   // skip this flag's value
@@ -148,6 +165,8 @@ export function parseCommand(command, binaries) {
     invocations.push({
       verb,
       sub,
+      // Every positional after the verb: `get cm/app secret/db` names two resources.
+      args: positional.slice(1),
       context: flag(rest, '--context'),
       kubeconfig: flag(rest, '--kubeconfig'),
       // --server/--token bypass the kubeconfig entirely; any context the
@@ -158,6 +177,10 @@ export function parseCommand(command, binaries) {
       dryRun: rest.includes('--dry-run') ? 'client' : dryRun,
       prune: rest.includes('--prune'),
       force: rest.includes('--force'),
+      output: outputFormat(rest),
+      template: rest.some((t) => t === '--template' || t.startsWith('--template=')),
+      // `config view --raw` is boolean; `get --raw <path>` takes an API path.
+      raw: rest.some((t) => t === '--raw' || t.startsWith('--raw=')) ? (flag(rest, '--raw') ?? '') : undefined,
       // Inline `KUBECONFIG=... kubectl ...` overrides the ambient environment,
       // exactly as the shell would apply it.
       env,
