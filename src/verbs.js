@@ -20,6 +20,28 @@ export const READ = new Set([
   'wait', 'port-forward',
 ])
 
+// Output formats that print no field values. Anything else, including a
+// format we don't recognize, can print a secret's data.
+const VALUELESS_OUTPUT = new Set(['name', 'wide'])
+
+const isSecretResource = (arg) => arg.split(',').some((r) => {
+  const kind = r.toLowerCase().split('/')[0].split('.')[0]
+  return kind === 'secret' || kind === 'secrets'
+})
+
+/**
+ * A read whose output carries credentials: secret values, or the kubeconfig's
+ * keys and tokens. Plain `get secret` and `describe secret` print names and
+ * sizes only, so they stay reads.
+ */
+export function revealsSecrets(inv) {
+  if (inv.verb === 'config') return inv.sub === 'view' && inv.raw !== undefined
+  if (inv.verb !== 'get') return false
+  if (inv.raw !== undefined && /\/secrets(\/|\?|$)/.test(inv.raw)) return true
+  const printsValues = inv.template || (inv.output !== undefined && !VALUELESS_OUTPUT.has(inv.output))
+  return printsValues && inv.args.some(isSecretResource)
+}
+
 /**
  * Tier a parsed invocation. `scale --replicas=0` is promoted to irreversible:
  * it discards running state as thoroughly as a delete.

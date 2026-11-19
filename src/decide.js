@@ -4,7 +4,7 @@
 import { parseCommand } from './matcher.js'
 import { resolveContext } from './resolver.js'
 import { classify } from './classifier.js'
-import { tierOf, IRREVERSIBLE } from './verbs.js'
+import { tierOf, revealsSecrets, IRREVERSIBLE } from './verbs.js'
 import { label } from './redact.js'
 
 const RANK = { allow: 0, ask: 1, deny: 2 }
@@ -31,7 +31,19 @@ export function decide(command, cfg, env = process.env) {
     const { context } = resolveContext(inv, env)
     const tier = isDryRun(inv) ? 'read' : tierOf(inv)
 
-    if (tier === 'read') continue
+    if (tier === 'read') {
+      if (!revealsSecrets(inv)) continue
+      // `config view --raw` prints credentials for every context in the
+      // kubeconfig, so the ambient context being local exempts nothing.
+      if (inv.verb === 'config') {
+        take({ action: 'ask', context, reason: "kubectl-guard: 'config view --raw' prints kubeconfig credentials, and command output is sent to the model provider." })
+        continue
+      }
+      if (classify(context, cfg.localContexts) === 'local') continue
+      const where = label(context, cfg.showContextNames)
+      take({ action: 'ask', context, reason: `kubectl-guard: this 'get' prints secret values from ${where}, which is not a local cluster, and command output is sent to the model provider.` })
+      continue
+    }
     // config mutations rewrite the kubeconfig itself, retargeting later
     // commands in the session, so the local-context exemption cannot cover
     // them: they ask regardless of where the ambient context points.

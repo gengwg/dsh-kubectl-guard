@@ -72,6 +72,29 @@ const cases = [
   ['sudo delete denies',              'sudo kubectl delete pod x',            'deny'],
   ['sudo -u form denies',             'sudo -u root kubectl delete pod x',    'deny'],
   ['time apply asks',                 'time kubectl apply -f d.yaml',         'ask'],
+  // Command output goes to the model provider, so reads that print secret
+  // values or raw kubeconfig credentials ask outside local contexts.
+  ['secret values ask',               'kubectl get secret db -o yaml',        'ask'],
+  ['secret json asks',                'kubectl get secrets -n app -o json',   'ask'],
+  ['secret jsonpath asks',            "kubectl get secret db -o jsonpath='{.data.password}' | base64 -d", 'ask'],
+  ['attached -oyaml asks',            'kubectl get secret db -oyaml',         'ask'],
+  ['--output= asks',                  'kubectl get secret/db --output=json',  'ask'],
+  ['-o after boolean shorthand asks', 'kubectl get secrets -Ao yaml',         'ask'],
+  ['secret in a comma list asks',     'kubectl get cm,secret -o yaml',        'ask'],
+  ['secret as a later resource asks', 'kubectl get cm/app secret/db -o yaml', 'ask'],
+  ['last -o wins',                    'kubectl get secret db -o name -o yaml', 'ask'],
+  ['--template asks',                 "kubectl get secret db --template='{{.data.token}}'", 'ask'],
+  ['raw API path to secrets asks',    'kubectl get --raw /api/v1/namespaces/app/secrets/db', 'ask'],
+  ['config view --raw asks',          'kubectl config view --raw',            'ask'],
+  ['config view --raw asks on local', 'kubectl --context minikube config view --raw --minify', 'ask'],
+  ['secret names only',               'kubectl get secrets',                  'allow'],
+  ['describe secret shows sizes only','kubectl describe secret db',           'allow'],
+  ['-o name prints names only',       'kubectl get secrets -o name',          'allow'],
+  ['-o wide prints no values',        'kubectl get secret db -o wide',        'allow'],
+  ['yaml of a configmap',             'kubectl get cm app -o yaml',           'allow'],
+  ['namespace called secrets',        'kubectl get pods -n secrets -o yaml',  'allow'],
+  ['raw API path elsewhere',          'kubectl get --raw /healthz',           'allow'],
+  ['local secret values are exempt',  'kubectl --context kind-dev get secret db -o yaml', 'allow'],
 ]
 
 for (const [title, command, expected] of cases) {
@@ -88,7 +111,7 @@ test('unresolvable kubeconfig is treated as production', () => {
 
 test('context name never reaches model-facing text by default', () => {
   _clearCache()
-  for (const command of ['kubectl delete pod x', 'kubectl apply -f d.yaml']) {
+  for (const command of ['kubectl delete pod x', 'kubectl apply -f d.yaml', 'kubectl get secret db -o yaml']) {
     const { reason } = decide(command, cfg, env)
     assert.ok(!reason.includes(PROD_CONTEXT), `leaked context name in: ${reason}`)
     assert.match(reason, /ctx#[0-9a-f]{8}/)
