@@ -1,9 +1,9 @@
 import { beforeEach, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { apply } from '../src/index.js'
+import { Config, apply } from '../src/index.js'
 import { _clearCache } from '../src/resolver.js'
 
 const PROD_CONTEXT = 'orbital-badger-prod'
@@ -36,12 +36,13 @@ function cordis(overrides = {}) {
       listeners.set(event, [...(listeners.get(event) || []), fn])
     },
   }
-  apply(ctx, { ...cfg, ...overrides })
+  // Through the real schema, so defaults such as haltAfterDenials apply.
+  apply(ctx, Config({ ...cfg, ...overrides }))
   return { registrations, guards, preExecute: listeners.get('tools/pre-execute') || [] }
 }
 
-function exec(command, name = 'bash') {
-  return { name, arguments: { command } }
+function exec(command, name = 'bash', session) {
+  return { name, arguments: { command }, ...(session ? { agent: { session } } : {}) }
 }
 
 function prod(command) {
@@ -131,4 +132,67 @@ test('a chained apply and delete remains deny after pre-execute', async () => {
   const final = early === delegated ? guards[0](call) : early
   assert.equal(typeof final, 'string')
   assert.match(final, /'delete' is irreversible/)
+})
+
+const del = (session) => exec(prod('kubectl delete pod web-1'), 'bash', session)
+const read = (session) => exec(prod('kubectl get pods'), 'bash', session)
+
+test('three denials in a row halt kubectl for that session, reads included', async () => {
+  const { guards, preExecute } = cordis()
+  const session = {}
+  assert.match(guards[0](del(session)), /Denied\.$/)
+  assert.match(guards[0](del(session)), /Denied\.$/)
+  assert.match(guards[0](del(session)), /halted for this session/)
+  assert.match(guards[0](read(session)), /halted for this session/)
+  // A halted session gets no approval prompt; the guard refuses instead.
+  assert.equal(await preExecute[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session), next), delegated)
+  assert.match(guards[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session)), /halted/)
+})
+
+test('an allowed kubectl command resets the denial count', () => {
+  const { guards } = cordis()
+  const session = {}
+  guards[0](del(session)); guards[0](del(session))
+  assert.equal(guards[0](read(session)), undefined)
+  guards[0](del(session)); guards[0](del(session))
+  assert.equal(guards[0](read(session)), undefined)
+})
+
+test('non-kubectl commands neither count nor reset the denials', () => {
+  const { guards } = cordis()
+  const session = {}
+  guards[0](del(session)); guards[0](del(session))
+  assert.equal(guards[0](exec('echo hi', 'bash', session)), undefined)
+  assert.match(guards[0](del(session)), /halted for this session/)
+})
+
+test('the halt is per session', () => {
+  const { guards } = cordis()
+  const a = {}, b = {}
+  for (let i = 0; i < 3; i++) guards[0](del(a))
+  assert.match(guards[0](read(a)), /halted/)
+  assert.equal(guards[0](read(b)), undefined)
+})
+
+test('haltAfterDenials 0 turns the halt off', () => {
+  const { guards } = cordis({ haltAfterDenials: 0 })
+  const session = {}
+  for (let i = 0; i < 5; i++) assert.match(guards[0](del(session)), /Denied\.$/)
+  assert.equal(guards[0](read(session)), undefined)
+})
+
+test('the decision log records allow, ask and deny without the context name or command', async () => {
+  const log = join(dir, 'decisions.jsonl')
+  const { guards, preExecute } = cordis({ decisionLog: log })
+  const session = {}
+  guards[0](exec(prod('kubectl get pods --token=s3cr3t'), 'bash', session))
+  await preExecute[0](exec(prod('kubectl apply -f d.yaml'), 'bash', session), next)
+  guards[0](del(session))
+  guards[0](exec('ls -la', 'bash', session))
+  const text = readFileSync(log, 'utf8')
+  const entries = text.trim().split('\n').map((line) => JSON.parse(line))
+  assert.deepEqual(entries.map((e) => [e.action, e.verbs.join(',')]), [['allow', 'get'], ['ask', 'apply'], ['deny', 'delete']])
+  assert.ok(entries.every((e) => typeof e.at === 'string'))
+  assert.ok(!text.includes(PROD_CONTEXT), text)
+  assert.ok(!text.includes('s3cr3t'), text)
 })

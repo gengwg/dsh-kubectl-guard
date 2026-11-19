@@ -63,5 +63,7 @@ export function decide(command, cfg, env = process.env) {
       take({ action: 'ask', context, reason: `kubectl-guard: '${inv.verb}' writes to ${where}, which is not a local cluster.` })
     }
   }
-  return worst
+  // `guarded` says a guarded binary was involved, so the caller can tell a kubectl
+  // allow from an unrelated shell command; `verbs` is safe to log, unlike the command.
+  return { ...worst, guarded: invocations.length > 0 || ambiguous, verbs: invocations.map((inv) => inv.verb) }
 }
