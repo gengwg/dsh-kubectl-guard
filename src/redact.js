@@ -17,6 +17,7 @@ export function pseudonym(context) {
 
 /** @param {boolean} reveal when true, show the real name (opt-in). */
 export function label(context, reveal) {
-  if (reveal) return context ?? '<unresolved>'
+  // DEBUG shows real names to make local troubleshooting easier.
+  if (reveal || process.env.DEBUG) return context ?? '<unresolved>'
   return pseudonym(context)
 }

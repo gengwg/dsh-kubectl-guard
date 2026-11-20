@@ -3,9 +3,9 @@
 
 export const DEFAULT_LOCAL = ['minikube', 'kind-*', 'docker-desktop', 'docker-for-desktop', 'rancher-desktop', 'k3d-*', 'colima']
 
-/** Glob with `*` only; anchored. */
+/** Glob with `*` only. Unanchored so `kind-*` also covers prefixed names. */
 function matches(pattern, value) {
-  const re = new RegExp(`^${pattern.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`)
+  const re = new RegExp(`${pattern.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}`)
   return re.test(value)
 }
 

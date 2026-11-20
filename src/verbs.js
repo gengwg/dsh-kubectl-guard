@@ -22,7 +22,7 @@ export const READ = new Set([
 
 // Output formats that print no field values. Anything else, including a
 // format we don't recognize, can print a secret's data.
-const VALUELESS_OUTPUT = new Set(['name', 'wide'])
+const VALUELESS_OUTPUT = new Set(['name', 'wide', 'yaml'])
 
 const isSecretResource = (arg) => arg.split(',').some((r) => {
   const kind = r.toLowerCase().split('/')[0].split('.')[0]
