@@ -1,7 +1,7 @@
 // Verb tiers. Data, not code: adding a binary or verb is an edit here.
 
 // Irreversible: no undo, no dry-run that helps. Hard denied outside local contexts.
-export const IRREVERSIBLE = new Set(['delete', 'drain', 'evict'])
+export const IRREVERSIBLE = new Set(['delete', 'drain'])
 
 // Mutating but recoverable. Asked, with a diff where one is available.
 export const REVERSIBLE = new Set([
