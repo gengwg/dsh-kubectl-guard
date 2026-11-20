@@ -1,0 +1,51 @@
+name: ocr-review
+
+# AI review of each pull request with Alibaba Open Code Review: inline
+# comments on the changed lines plus one summary comment updated in place.
+# Repository settings: variables OCR_LLM_URL (an OpenAI-compatible
+# /v1/chat/completions endpoint) and OCR_LLM_MODEL, secret OCR_LLM_AUTH_TOKEN.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ocr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Fork PRs get no secrets under pull_request, so they skip instead of
+    # failing. Drafts wait for ready_for_review.
+    if: >-
+      !github.event.pull_request.draft
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - id: ocr
+        # No checkout step: the action checks out the base with full history
+        # and fetches the PR head itself. It installs the CLI at run time, so
+        # pin both the action and ocr_version.
+        uses: alibaba/open-code-review@445ad9dea3057346986197385858a1a281253cc9  # v1.13.13
+        with:
+          ocr_version: '1.13.13'
+          llm_url: ${{ vars.OCR_LLM_URL }}
+          llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          llm_model: ${{ vars.OCR_LLM_MODEL }}
+          llm_use_anthropic: 'false'
+          effort: low
+          review_task_timeout: '12'
+          review_concurrency: '4'
+          sticky_summary: 'true'
+          incremental: 'true'
+      # The action fails the job when the review fails, but a run whose
+      # summary comment never posted would otherwise still be green.
+      - name: Require the summary comment
+        if: steps.ocr.outputs.summary_comment_url == ''
+        run: |
+          echo "::error::Review finished but no summary comment was posted"
+          exit 1
