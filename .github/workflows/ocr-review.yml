@@ -54,6 +54,9 @@ jobs:
       # action uses to find it, so the next successful run updates it again.
       - name: Mark the summary as not current
         if: failure()
+        # Explicit bash adds pipefail: a failed listing must not fall through
+        # to posting a duplicate summary.
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
