@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # Bumped by hand together with ocr_version in ocr-review.yml, so the
+      # PR that changes the reviewer runs the new version on itself.
+      - dependency-name: "alibaba/open-code-review"
